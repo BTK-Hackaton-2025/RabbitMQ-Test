@@ -1,0 +1,301 @@
+version: "3.8"
+
+# Docker secrets for sensitive data
+secrets:
+  rabbitmq_user:
+    file: ./secrets/rabbitmq_user.txt
+  rabbitmq_password:
+    file: ./secrets/rabbitmq_password.txt
+  rabbitmq_erlang_cookie:
+    file: ./secrets/rabbitmq_erlang_cookie.txt
+
+# Named volumes for persistence
+volumes:
+  rabbitmq_data:
+    driver: local
+  rabbitmq_logs:
+    driver: local
+
+# Custom network for service isolation
+networks:
+  ecommerce_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+services:
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: ecommerce-rabbitmq
+    hostname: rabbitmq-server
+    restart: unless-stopped
+
+    environment:
+      # Read credentials from secrets (new format for RabbitMQ 3.12+)
+      RABBITMQ_DEFAULT_USER: ecommerce_user
+      RABBITMQ_DEFAULT_PASS: SecurePass123!
+      RABBITMQ_ERLANG_COOKIE: super-secret-erlang-cookie-for-clustering
+
+      # Performance and security settings
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: >-
+        -rabbit disk_free_limit 2147483648
+        -rabbit vm_memory_high_watermark 0.8
+
+    # Persist data and logs
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_logs:/var/log/rabbitmq
+      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
+
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
+
+    networks:
+      - ecommerce_network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+  # Order Producer Service
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: producer
+
+    container_name: ecommerce-producer
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: order-producer
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+    # Interactive mode for demo
+    stdin_open: true
+    tty: true
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  # Order Processing Workers (Scaled)
+  processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: order-processor
+      WORKER_TYPE: processor
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+    # Scale this service
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  # Inventory Service
+  inventory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    container_name: ecommerce-inventory
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: inventory-service
+      WORKER_TYPE: inventory
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+  # Email Service
+  email:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    container_name: ecommerce-email
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: email-service
+      WORKER_TYPE: email
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+  # Analytics Service
+  analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    container_name: ecommerce-analytics
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: analytics-service
+      WORKER_TYPE: analytics
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+  # Regional Fulfillment Centers
+  fulfillment-us:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    container_name: ecommerce-fulfillment-us
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: fulfillment-us
+      WORKER_TYPE: fulfillment_US
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+  fulfillment-eu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    container_name: ecommerce-fulfillment-eu
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: fulfillment-eu
+      WORKER_TYPE: fulfillment_EU
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+  fulfillment-asia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: consumer
+
+    container_name: ecommerce-fulfillment-asia
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_URL: amqp://ecommerce_user:ecommerce_pass@rabbitmq:5672/
+      SERVICE_NAME: fulfillment-asia
+      WORKER_TYPE: fulfillment_ASIA
+      LOG_LEVEL: info
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - ecommerce_network
+
+  # Monitoring (Optional)
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: ecommerce-monitoring
+    restart: unless-stopped
+
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+    ports:
+      - "9090:9090"
+
+    networks:
+      - ecommerce_network
+
+    profiles:
+      - monitoring

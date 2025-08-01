@@ -1,0 +1,222 @@
+{
+  "users": [
+    {
+      "name": "stox",
+      "password": "stoxpass123",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "stox",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "stox.images",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "stox.marketplaces",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "stox.orders",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "stox.sync",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "image_uploads",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "ai_processing",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "seo_generation",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "marketplace_broadcast",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "amazon_orders",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "trendyol_orders",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "hepsiburada_orders",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    },
+    {
+      "name": "inventory_sync",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 10000
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "stox.images",
+      "vhost": "/",
+      "destination": "image_uploads",
+      "destination_type": "queue",
+      "routing_key": "image.upload",
+      "arguments": {}
+    },
+    {
+      "source": "stox.images",
+      "vhost": "/",
+      "destination": "ai_processing",
+      "destination_type": "queue",
+      "routing_key": "image.process",
+      "arguments": {}
+    },
+    {
+      "source": "stox.images",
+      "vhost": "/",
+      "destination": "seo_generation",
+      "destination_type": "queue",
+      "routing_key": "image.enhanced",
+      "arguments": {}
+    },
+    {
+      "source": "stox.marketplaces",
+      "vhost": "/",
+      "destination": "marketplace_broadcast",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "stox.orders",
+      "vhost": "/",
+      "destination": "amazon_orders",
+      "destination_type": "queue",
+      "routing_key": "order.amazon",
+      "arguments": {}
+    },
+    {
+      "source": "stox.orders",
+      "vhost": "/",
+      "destination": "trendyol_orders",
+      "destination_type": "queue",
+      "routing_key": "order.trendyol",
+      "arguments": {}
+    },
+    {
+      "source": "stox.orders",
+      "vhost": "/",
+      "destination": "hepsiburada_orders",
+      "destination_type": "queue",
+      "routing_key": "order.hepsiburada",
+      "arguments": {}
+    },
+    {
+      "source": "stox.sync",
+      "vhost": "/",
+      "destination": "inventory_sync",
+      "destination_type": "queue",
+      "routing_key": "sync.inventory",
+      "arguments": {}
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "/",
+      "name": "ha-all",
+      "pattern": ".*",
+      "apply-to": "all",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic"
+      },
+      "priority": 0
+    }
+  ]
+}

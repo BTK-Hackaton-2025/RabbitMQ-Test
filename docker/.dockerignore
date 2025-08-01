@@ -1,0 +1,42 @@
+# Docker ignore file
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Secrets and sensitive files
+secrets/
+*.key
+*.pem
+*.p12
+
+# Build artifacts
+bin/
+build/
+dist/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test files
+*_test.go
+test/
+coverage.out

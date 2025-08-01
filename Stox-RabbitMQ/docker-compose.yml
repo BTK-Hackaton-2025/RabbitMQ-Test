@@ -1,0 +1,250 @@
+version: "3.8"
+
+services:
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: stox-rabbitmq
+    hostname: stox-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: stox
+      RABBITMQ_DEFAULT_PASS: stoxpass123
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./config/definitions.json:/etc/rabbitmq/definitions.json:ro
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
+    networks:
+      - stox-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Image Processing Service
+  image-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: image-service
+    container_name: stox-image-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=image-service
+      - LOG_LEVEL=info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # AI Enhancement Service (3 replicas for scaling)
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: ai-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=ai-service
+      - LOG_LEVEL=info
+      - WORKER_ID=${WORKER_ID:-1}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  # SEO Content Generation Service
+  seo-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: seo-service
+    container_name: stox-seo-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=seo-service
+      - LOG_LEVEL=info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # Amazon Marketplace Service
+  amazon-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: amazon-service
+    container_name: stox-amazon-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=amazon-service
+      - LOG_LEVEL=info
+      - MARKETPLACE=amazon
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.3"
+
+  # Trendyol Marketplace Service
+  trendyol-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: trendyol-service
+    container_name: stox-trendyol-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=trendyol-service
+      - LOG_LEVEL=info
+      - MARKETPLACE=trendyol
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.3"
+
+  # Hepsiburada Marketplace Service
+  hepsiburada-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: hepsiburada-service
+    container_name: stox-hepsiburada-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=hepsiburada-service
+      - LOG_LEVEL=info
+      - MARKETPLACE=hepsiburada
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.3"
+
+  # Inventory Synchronization Service
+  sync-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: sync-service
+    container_name: stox-sync-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=sync-service
+      - LOG_LEVEL=info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.3"
+
+  # Demo Service (optional - for testing)
+  demo-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: demo
+    container_name: stox-demo-service
+    environment:
+      - RABBITMQ_URL=amqp://stox:stoxpass123@rabbitmq:5672/
+      - SERVICE_NAME=demo
+      - LOG_LEVEL=info
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      image-service:
+        condition: service_started
+    networks:
+      - stox-network
+    restart: "no" # Run once for demo
+    profiles:
+      - demo
+
+  # Monitoring and Management
+  rabbitmq-exporter:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: stox-rabbitmq-exporter
+    environment:
+      - RABBIT_URL=http://stox:stoxpass123@rabbitmq:15672
+    ports:
+      - "9419:9419"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stox-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+networks:
+  stox-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  rabbitmq_data:
+    driver: local
